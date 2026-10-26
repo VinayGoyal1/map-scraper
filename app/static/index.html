@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maps Business Extractor</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #121826;
+      --panel-2: #171f30;
+      --border: #263043;
+      --text: #e8edf7;
+      --muted: #8b97ad;
+      --accent: #4f8cff;
+      --accent-2: #7c5cff;
+      --ok: #34d399;
+      --err: #f87171;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(1100px 500px at 15% -10%, rgba(79,140,255,.16), transparent 60%),
+        radial-gradient(900px 500px at 100% 0%, rgba(124,92,255,.14), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font: 15px/1.5 "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    a { color: inherit; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; padding: 18px 28px; border-bottom: 1px solid var(--border);
+      background: rgba(11,15,23,.7); backdrop-filter: blur(8px);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
+    .logo {
+      width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); font-size: 16px;
+    }
+    .links { display: flex; gap: 18px; font-size: 13.5px; color: var(--muted); }
+    .links a { text-decoration: none; }
+    .links a:hover { color: var(--text); }
+    main { width: min(1180px, calc(100% - 40px)); margin: 0 auto; padding: 40px 0 60px; }
+    h1 { font-size: clamp(24px, 3.2vw, 36px); line-height: 1.15; margin: 0 0 10px; letter-spacing: -.5px; }
+    h1 span { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .sub { color: var(--muted); max-width: 640px; margin: 0 0 26px; }
+    form {
+      display: flex; gap: 10px; padding: 10px; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--panel);
+      box-shadow: 0 18px 45px rgba(0,0,0,.35);
+    }
+    input, select, button { font: inherit; color: var(--text); }
+    input[type=text], input[type=url], input[type=search], select {
+      flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,140,255,.15); }
+    button {
+      border: 0; border-radius: 10px; padding: 12px 18px; font-weight: 600; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+      white-space: nowrap; transition: filter .15s ease, transform .15s ease;
+    }
+    button:hover:not(:disabled) { filter: brightness(1.08); }
+    button:active:not(:disabled) { transform: translateY(1px); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    button.ghost {
+      background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 500;
+    }
+    button.ghost:hover:not(:disabled) { border-color: #3a465f; background: var(--panel-2); }
+    .status { min-height: 24px; margin-top: 12px; font-size: 13.5px; color: var(--muted); display: flex; align-items: center; gap: 9px; }
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.18);
+      border-top-color: var(--accent); animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 28px 0; }
+    .stat { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+    .stat b { display: block; font-size: 26px; letter-spacing: -.5px; }
+    .stat span { color: var(--muted); font-size: 12.5px; text-transform: uppercase; letter-spacing: .7px; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .toolbar { display: flex; gap: 10px; padding: 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .toolbar input, .toolbar select { flex: 1 1 180px; padding: 10px 12px; }
+    .toolbar button, .toolbar a.btn {
+      padding: 10px 14px; border-radius: 10px; font-size: 14px; text-decoration: none;
+      display: inline-flex; align-items: center;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th {
+      text-align: left; padding: 11px 14px; font-size: 11.5px; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--muted); background: rgba(255,255,255,.02);
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    td { padding: 13px 14px; border-bottom: 1px solid rgba(38,48,67,.65); vertical-align: top; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: rgba(79,140,255,.045); }
+    .name { font-weight: 600; }
+    .small { color: var(--muted); font-size: 12.5px; }
+    .pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11.5px;
+      border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+    }
+    .pill.yes { color: var(--ok); border-color: rgba(52,211,153,.35); background: rgba(52,211,153,.08); }
+    .pill.no { color: #9aa6ba; }
+    .link { color: #8ab4ff; text-decoration: none; }
+    .link:hover { text-decoration: underline; }
+    .icon-btn {
+      background: transparent; border: 1px solid var(--border); padding: 6px 10px;
+      font-size: 12px; border-radius: 8px; color: var(--muted); font-weight: 500;
+    }
+    .icon-btn:hover { color: var(--err); border-color: rgba(248,113,113,.5); background: rgba(248,113,113,.08); }
+    .empty { padding: 46px 20px; text-align: center; color: var(--muted); }
+    .pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+    .toast {
+      position: fixed; right: 22px; bottom: 22px; max-width: min(460px, calc(100vw - 44px));
+      padding: 13px 16px; border-radius: 12px; border: 1px solid var(--border);
+      background: #1a2233; box-shadow: 0 20px 50px rgba(0,0,0,.5); font-size: 14px;
+      opacity: 0; transform: translateY(12px); pointer-events: none; transition: .22s ease; z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok { border-color: rgba(52,211,153,.45); }
+    .toast.err { border-color: rgba(248,113,113,.5); }
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      main { padding-top: 26px; }
+      form { flex-direction: column; }
+      header { padding: 14px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">◎</span> Maps Extractor</div>
+    <div class="links">
+      <a href="/docs" target="_blank" rel="noreferrer">API docs</a>
+      <a href="/api/health" target="_blank" rel="noreferrer">Health</a>
+      <a href="/api/export.csv">Export CSV</a>
+    </div>
+  </header>
+
+  <main>
+    <h1>Turn a Google Maps link into <span>a database row.</span></h1>
+    <p class="sub">
+      Paste a place link below. The tool opens Google Maps, reads the business details,
+      looks for an email on the business website, and saves everything to PostgreSQL.
+    </p>
+
+    <form id="extract-form">
+      <input id="url-input" type="text" autocomplete="off" spellcheck="false"
+             placeholder="https://maps.app.goo.gl/...  or  https://www.google.com/maps/place/..." />
+      <button id="extract-btn" type="submit">Extract &amp; save</button>
+    </form>
+    <div id="status" class="status"></div>
+
+    <section class="stats">
+      <div class="stat"><b id="stat-total">–</b><span>Businesses</span></div>
+      <div class="stat"><b id="stat-website">–</b><span>With website</span></div>
+      <div class="stat"><b id="stat-no-website">–</b><span>Without website</span></div>
+      <div class="stat"><b id="stat-email">–</b><span>With email</span></div>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name, phone, email, address…" />
+        <select id="filter">
+          <option value="">All businesses</option>
+          <option value="site">Has website</option>
+          <option value="nosite">No website</option>
+          <option value="email">Has email</option>
+          <option value="noemail">No email</option>
+        </select>
+        <button id="refresh" class="ghost" type="button">Refresh</button>
+        <a class="btn ghost" href="/api/export.csv">Download CSV</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>Phone</th>
+              <th>Website</th>
+              <th>Email</th>
+              <th>Map</th>
+              <th>Saved</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span id="page-info">Loading…</span>
+        <span>
+          <button id="prev" class="ghost" type="button">Prev</button>
+          <button id="next" class="ghost" type="button">Next</button>
+        </span>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const LIMIT = 25;
+    let offset = 0;
+    let total = 0;
+    let searchTimer = null;
+
+    const $ = (id) => document.getElementById(id);
+    const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+
+    const safeHref = (value) => /^https?:\/\//i.test(String(value || "")) ? value : null;
+    const hostOf = (value) => {
+      try { return new URL(value).hostname.replace(/^www\./, ""); }
+      catch { return value; }
+    };
+
+    function toast(message, kind = "ok") {
+      const el = $("toast");
+      el.textContent = message;
+      el.className = `toast show ${kind}`;
+      clearTimeout(el._timer);
+      el._timer = setTimeout(() => { el.className = "toast"; }, 5000);
+    }
+
+    function setBusy(busy, message = "") {
+      $("extract-btn").disabled = busy;
+      $("url-input").disabled = busy;
+      const status = $("status");
+      if (busy) {
+        status.innerHTML = `<span class="spinner"></span><span>${esc(message)}</span>`;
+      } else if (!message) {
+        status.innerHTML = "";
+      } else {
+        status.textContent = message;
+      }
+    }
+
+    function renderRows(items) {
+      const body = $("rows");
+      if (!items.length) {
+        body.innerHTML = `<tr><td colspan="7" class="empty">
+          No businesses yet. Paste a Google Maps link above to add the first one.
+        </td></tr>`;
+        return;
+      }
+
+      body.innerHTML = items.map((b) => {
+        const site = safeHref(b.website);
+        const map = safeHref(b.map_url);
+        const email = b.email ? `<a class="link" href="mailto:${esc(b.email)}">${esc(b.email)}</a>` : `<span class="small">—</span>`;
+        const extraEmails = (b.emails_found || []).length > 1
+          ? `<div class="small">+${b.emails_found.length - 1} more</div>` : "";
+        const phone = b.phone ? `<a class="link" href="tel:${esc(b.phone.replace(/[^\d+]/g, ""))}">${esc(b.phone)}</a>` : `<span class="small">—</span>`;
+        const website = site
+          ? `<a class="link" href="${esc(site)}" target="_blank" rel="noreferrer">${esc(hostOf(site))}</a>
+             <div class="pill yes">website</div>`
+          : `<span class="pill no">no website</span>`;
+        const saved = b.created_at ? new Date(b.created_at).toLocaleDateString() : "—";
+        const meta = [b.category, b.rating ? `★ ${b.rating}` : null].filter(Boolean).join(" · ");
+        const address = b.address ? `<div class="small">${esc(b.address)}</div>` : "";
+
+        return `<tr>
+          <td>
+            <div class="name">${esc(b.name)}</div>
+            ${meta ? `<div class="small">${esc(meta)}</div>` : ""}
+            ${address}
+          </td>
+          <td>${phone}</td>
+          <td>${website}</td>
+          <td>${email}${extraEmails}</td>
+          <td>${map ? `<a class="link" href="${esc(map)}" target="_blank" rel="noreferrer">Open ↗</a>` : "—"}</td>
+          <td class="small">${esc(saved)}</td>
+          <td><button class="icon-btn" data-delete="${b.id}" data-name="${esc(b.name)}">Delete</button></td>
+        </tr>`;
+      }).join("");
+
+      body.querySelectorAll("[data-delete]").forEach((btn) => {
+        btn.addEventListener("click", () => removeBusiness(btn.dataset.delete, btn.dataset.name));
+      });
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/stats");
+        if (!res.ok) return;
+        const s = await res.json();
+        $("stat-total").textContent = s.total;
+        $("stat-website").textContent = s.with_website;
+        $("stat-no-website").textContent = s.without_website;
+        $("stat-email").textContent = s.with_email;
+      } catch { /* stats are cosmetic */ }
+    }
+
+    async function load() {
+      const params = new URLSearchParams({ limit: LIMIT, offset });
+      const q = $("search").value.trim();
+      if (q) params.set("q", q);
+
+      const filter = $("filter").value;
+      if (filter === "site") params.set("has_website", "true");
+      if (filter === "nosite") params.set("has_website", "false");
+      if (filter === "email") params.set("has_email", "true");
+      if (filter === "noemail") params.set("has_email", "false");
+
+      $("page-info").textContent = "Loading…";
+      try {
+        const res = await fetch(`/api/businesses?${params}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+        total = data.total;
+        renderRows(data.items);
+        const from = total ? offset + 1 : 0;
+        const to = Math.min(offset + data.items.length, total);
+        $("page-info").textContent = `${from}–${to} of ${total}`;
+        $("prev").disabled = offset === 0;
+        $("next").disabled = offset + LIMIT >= total;
+      } catch (err) {
+        $("rows").innerHTML = `<tr><td colspan="7" class="empty">${esc(err.message)}</td></tr>`;
+        $("page-info").textContent = "—";
+        toast(err.message, "err");
+      }
+    }
+
+    async function refreshAll() {
+      await Promise.all([load(), loadStats()]);
+    }
+
+    async function removeBusiness(id, name) {
+      if (!confirm(`Delete "${name}" from the database?`)) return;
+      try {
+        const res = await fetch(`/api/businesses/${id}`, { method: "DELETE" });
+        if (!res.ok && res.status !== 404) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || `Delete failed (${res.status})`);
+        }
+        toast(`Deleted "${name}"`, "ok");
+        if (offset > 0 && offset >= total - 1) offset = Math.max(0, offset - LIMIT);
+        await refreshAll();
+      } catch (err) {
+        toast(err.message, "err");
+      }
+    }
+
+    $("extract-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const url = $("url-input").value.trim();
+      if (!url) {
+        toast("Paste a Google Maps link first.", "err");
+        return;
+      }
+
+      const started = Date.now();
+      setBusy(true, "Opening Google Maps… 0s");
+      const timer = setInterval(() => {
+        const seconds = Math.round((Date.now() - started) / 1000);
+        setBusy(true, `Scraping business + searching website for email… ${seconds}s`);
+      }, 1000);
+
+      try {
+        const res = await fetch("/api/extract", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `Extraction failed (${res.status})`);
+
+        const b = data.business;
+        toast(`${data.created ? "Saved" : "Updated"}: ${b.name} (${data.duration_seconds}s)`, "ok");
+        $("url-input").value = "";
+        offset = 0;
+        await refreshAll();
+      } catch (err) {
+        toast(err.message, "err");
+      } finally {
+        clearInterval(timer);
+        setBusy(false);
+      }
+    });
+
+    $("search").addEventListener("input", () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => { offset = 0; load(); }, 300);
+    });
+    $("filter").addEventListener("change", () => { offset = 0; load(); });
+    $("refresh").addEventListener("click", refreshAll);
+    $("prev").addEventListener("click", () => {
+      offset = Math.max(0, offset - LIMIT);
+      load();
+    });
+    $("next").addEventListener("click", () => {
+      if (offset + LIMIT < total) { offset += LIMIT; load(); }
+    });
+
+    refreshAll();
+  </script>
+</body>
+</html>
